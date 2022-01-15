@@ -20,16 +20,16 @@ with open('wordle.json', 'r') as f:
     words = json.load(f)
 
 # Filter characters that don't exist
-bad_charaters = list('oedirlschump')
+bad_charaters = list('tonirlschumpfiggy')
 
 # Filter known characters
-known_charaters = list('atn')
+known_charaters = list('ade')
 
 # Filter known good positions
-regex_good = r"\w\w\w\w\w"
+regex_good = r"\w\w\w\we"
 
 # Filter known bad positions
-regex_bad = r"[^a][^t]\w[^n]\w"
+regex_bad = r"[^ad]\w\w\w\w"
 
 # Start search for most likely word
 filtered_words = words
@@ -63,15 +63,11 @@ print('Most Common:', filtered_words[:10])
 # Start over and calculate best word to eliminate choices
 filtered_words = words
 
-# Eliminate bad characters
-if bad_charaters:
-    filtered_words = [word for word in filtered_words if all(
-        chr not in word for chr in bad_charaters)]
-
-# Eliminate known characters
-if known_charaters:
-    filtered_words = [word for word in filtered_words if all(
-        chr not in word for chr in known_charaters)]
+# Update letter frequency to discount words with seen characters
+chars_to_ignore = bad_charaters + known_charaters
+for (key, value) in letter_score.items():
+    if key in chars_to_ignore:
+        letter_score[key] = -1
 
 filtered_words = sorted(filtered_words,
                         key=lambda word: count_common_characters(word),

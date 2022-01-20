@@ -1,31 +1,53 @@
 """I dont like wordle"""
 
 import re
+import math
 import json
+from collections import Counter
 from wordfreq import zipf_frequency
-
-# letter_score = {'e': 138.8, 't': 103.1, 'a': 89.3, 'o': 84.9, 'i': 84.1, 'n': 80.3, 's': 72.3, 'r': 69.8, 'h': 56.1, 'l': 45.2, 'd': 42.4, 'c': 37.1,
-#                 'u': 30.3, 'm': 27.9, 'f': 26.7, 'p': 23.8, 'g': 20.8, 'w': 18.7, 'y': 18.4, 'b': 16.4, 'v': 11.7, 'k': 6, 'x': 2.6, 'j': 1.8, 'q': 1.3, 'z': 1}
-
 
 # # counts single occurences of common characters
 # def count_common_characters(word):
 #     unique_chrs = ''.join(set(word))
 #     return sum([letter_score[chr] for chr in unique_chrs])
 
+# TRY ROATE
 
-def count_eliminated_guesses(word, words_to_target, chars_to_remove=''):
-    word = word.translate({ord(c): None for c in chars_to_remove})
+
+def count_eliminated_guesses(word, words_to_target, bad_chars=''):
+    """Count how many target words contain characters from the given word"""
+    word = word.translate({ord(c): None for c in bad_chars})
     unique_chrs = ''.join(set(word))
     return sum([1 for word in words_to_target if any(
         chr in word for chr in unique_chrs)])
 
 
-words = []
-with open('words.json', 'r') as f:
-    words = json.load(f)
+def common_letters(word, target):
+    """Count letters in common"""
+    in_common = Counter(word) & Counter(target)
+    return math.sqrt(sum(in_common.values()))
 
-print(len(words))
+
+def count_eliminated_guesses2(word, words_to_target, bad_chars=''):
+    """Count how many letters a word has incommon with the corpus"""
+    word = word.translate({ord(c): None for c in bad_chars})
+    return sum([common_letters(word, target) for target in words_to_target])
+
+
+# Load data
+words = []
+with open('answer-list.json', 'r', encoding='utf-8') as f:
+    words = json.load(f)
+words_count = len(words)
+print("Loaded:", words_count, "answers")
+
+elimination_words = []
+with open('guess-list.json', 'r', encoding='utf-8') as f:
+    elimination_words = json.load(f)
+print("Loaded:", len(elimination_words), "guesses")
+
+# Run constraints
+
 # Filter characters that don't exist
 bad_charaters = list('')
 
@@ -65,13 +87,13 @@ if regex_bad:
 
 # Sort by english frequency
 filtered_words = sorted(filtered_words, key=lambda word: zipf_frequency(
-    word, 'en', 'large'), reverse=True)
+    word, 'en', 'best'), reverse=True)
 
-print('Most Common:', filtered_words[:10])
+words_left_count = len(filtered_words)
+print('Words left:', '{:.2%}'.format(words_left_count/words_count))
+print('Best Guess:', filtered_words[:10])
 
 # Calculate best word to eliminate choices
-elimination_words = words
-
 # Remove words with invalid characters so we only eliminate remaining guesses
 if bad_charaters:
     elimination_words = [word for word in elimination_words if all(
@@ -94,11 +116,8 @@ chars_to_remove = ''.join(known_charaters + bad_charaters)
 elimination_words = sorted(elimination_words, key=lambda word: zipf_frequency(
     word, 'en', 'large'), reverse=True)
 
-elimination_words = elimination_words[:2500]
-
-print(chars_to_remove)
 elimination_words = sorted(elimination_words,
-                           key=lambda word: count_eliminated_guesses(
+                           key=lambda word: count_eliminated_guesses2(
                                word, filtered_words, chars_to_remove),
                            reverse=True)
-print('Best for elimination2:', elimination_words[:10])
+print('Best for elimination:', elimination_words[:10])

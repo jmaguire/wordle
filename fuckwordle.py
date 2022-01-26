@@ -6,29 +6,15 @@ import json
 from collections import Counter
 from wordfreq import zipf_frequency
 
-# # counts single occurences of common characters
-# def count_common_characters(word):
-#     unique_chrs = ''.join(set(word))
-#     return sum([letter_score[chr] for chr in unique_chrs])
 
 # TRY ROATE
-
-
-def count_eliminated_guesses(word, words_to_target, bad_chars=''):
-    """Count how many target words contain characters from the given word"""
-    word = word.translate({ord(c): None for c in bad_chars})
-    unique_chrs = ''.join(set(word))
-    return sum([1 for word in words_to_target if any(
-        chr in word for chr in unique_chrs)])
-
-
 def common_letters(word, target):
     """Count letters in common"""
     in_common = Counter(word) & Counter(target)
     return math.sqrt(sum(in_common.values()))
 
 
-def count_eliminated_guesses2(word, words_to_target, bad_chars=''):
+def count_eliminated_guesses(word, words_to_target, bad_chars=''):
     """Count how many letters a word has incommon with the corpus"""
     word = word.translate({ord(c): None for c in bad_chars})
     return sum([common_letters(word, target) for target in words_to_target])
@@ -99,16 +85,6 @@ if bad_charaters:
     elimination_words = [word for word in elimination_words if all(
         chr not in word for chr in bad_charaters)]
 
-# # Update letter frequency to discount words with seen characters
-# for (key, value) in letter_score.items():
-#     if key in known_charaters:
-#         letter_score[key] = -1
-#
-# elimination_words = sorted(elimination_words,
-#                            key=lambda word: count_common_characters(word),
-#                            reverse=True)
-# print('Best for elimination:', elimination_words[:10])
-
 # Sorts by how many remaining words can be eliminated
 chars_to_remove = ''.join(known_charaters + bad_charaters)
 
@@ -117,7 +93,7 @@ elimination_words = sorted(elimination_words, key=lambda word: zipf_frequency(
     word, 'en', 'large'), reverse=True)
 
 elimination_words = sorted(elimination_words,
-                           key=lambda word: count_eliminated_guesses2(
+                           key=lambda word: count_eliminated_guesses(
                                word, filtered_words, chars_to_remove),
                            reverse=True)
 print('Best for elimination:', elimination_words[:10])

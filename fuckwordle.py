@@ -22,29 +22,30 @@ def common_letters(word, target):
     return len(set(word) & set(target))
 
 
-def count_eliminated_guesses(word, answers, bad_chars=''):
-    """Count how many letters a word has incommon with the corpus"""
-    word = word.translate({ord(c): None for c in bad_chars})
-    return sum([common_letters(word, target) for target in answers])
+def eliminated(word, target):
+    """Count letters in common"""
+    common_letters = len(set(word) & set(target))
+    common_positions = sum(
+        [1 if word[i] == target[i] else 0 for i in range(5)])
+    return common_letters + common_positions
 
 
-def score_guesses_loop(my_guesses, my_answers, bad_chars=''):
+def score_guesses_loop(my_guesses, my_answers):
     my_scores = {}
     for guess in my_guesses:
-        guess = guess.translate({ord(c): None for c in bad_chars})
-        my_scores[guess] = sum([common_letters(guess, word)
-                               for word in my_answers])
+        score = [eliminated(guess, word)
+                 for word in my_answers]
+        my_scores[guess] = sum(score)
     return my_scores
 
 
-def score_guesses(my_guesses, my_answers, bad_chars='', my_scores={}):
+def score_guesses(my_guesses, my_answers, my_scores={}):
     if len(my_guesses) == 0:
         return my_scores
     guess = my_guesses[0]
-    guess = guess.translate({ord(c): None for c in bad_chars})
     my_scores[guess] = sum([common_letters(guess, word)
                            for word in my_answers])
-    return score_guesses(my_guesses[1:], my_answers, bad_chars, my_scores)
+    return score_guesses(my_guesses[1:], my_answers, my_scores)
 
 
 sys.setrecursionlimit(15000)
@@ -114,12 +115,11 @@ if __name__ == '__main__':
 
     # Get top words
     # Characters that we already know about and do not reduce entropy
-    chars_to_remove = ''.join(good_characters + bad_charaters)
     process_count = 8
     parameters = []
     for guess_chunk in split(guesses, process_count):
         print(len(guess_chunk))
-        parameters.append((guess_chunk, answers, bad_charaters))
+        parameters.append((guess_chunk, answers))
 
     with multiprocessing.Pool(processes=process_count) as pool:
         start = timer()
@@ -131,4 +131,4 @@ if __name__ == '__main__':
                     reverse=True)
     end = timer()
     print('Multiprocess', end - start)
-    print('Best for elimination:', scores[:10])
+    print('Best for elimination:', scores[:3])

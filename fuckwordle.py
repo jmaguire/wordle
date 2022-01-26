@@ -22,21 +22,20 @@ def common_letters(word, target):
     return len(set(word) & set(target))
 
 
-def eliminated(word, target):
+def eliminated(word, target, known_letters):
     """Count letters in common"""
-    common_letters = len(set(word) & set(target))
-    common_positions = sum(
-        [1 if word[i] == target[i] else 0 for i in range(5)])
-    return common_letters + common_positions
+    same_letters = set(word).intersection(target).difference(known_letters)
+    same_positions = set([word[i] for i in range(
+        5) if word[i] == target[i]]).difference(known_letters)
+    return len(same_letters) + len(same_positions)
 
 
-def score_guesses_loop(my_guesses, my_answers):
-    my_scores = {}
-    for guess in my_guesses:
-        score = [eliminated(guess, word)
-                 for word in my_answers]
-        my_scores[guess] = sum(score)
-    return my_scores
+def score_guesses_loop(guesses, answers, known_letters):
+    scores = {}
+    for guess in guesses:
+        scores[guess] = sum([eliminated(guess, word, known_letters)
+                             for word in answers])
+    return scores
 
 
 def score_guesses(my_guesses, my_answers, my_scores={}):
@@ -115,11 +114,12 @@ if __name__ == '__main__':
 
     # Get top words
     # Characters that we already know about and do not reduce entropy
+    known_characters = ''.join(good_characters + bad_charaters)
     process_count = 8
     parameters = []
     for guess_chunk in split(guesses, process_count):
         print(len(guess_chunk))
-        parameters.append((guess_chunk, answers))
+        parameters.append((guess_chunk, answers, known_characters))
 
     with multiprocessing.Pool(processes=process_count) as pool:
         start = timer()

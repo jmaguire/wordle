@@ -1,99 +1,134 @@
 """I dont like wordle"""
-
+from timeit import default_timer as timer
 import re
 import math
 import json
 from collections import Counter
 from wordfreq import zipf_frequency
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+import itertools
+import sys
 
 
 # TRY ROATE
+def split(a, n):
+    k, m = divmod(len(a), n)
+    return (a[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
+
+
 def common_letters(word, target):
     """Count letters in common"""
-    in_common = Counter(word) & Counter(target)
-    return math.sqrt(sum(in_common.values()))
+    return len(set(word) & set(target))
 
 
-def count_eliminated_guesses(word, words_to_target, bad_chars=''):
+def count_eliminated_guesses(word, answers, bad_chars=''):
     """Count how many letters a word has incommon with the corpus"""
     word = word.translate({ord(c): None for c in bad_chars})
-    return sum([common_letters(word, target) for target in words_to_target])
+    return sum([common_letters(word, target) for target in answers])
 
 
-# Load data
-words = []
-with open('answer-list.json', 'r', encoding='utf-8') as f:
-    words = json.load(f)
-words_count = len(words)
-print("Loaded:", words_count, "answers")
+def score_guesses_loop(my_guesses, my_answers, bad_chars=''):
+    my_scores = {}
+    for guess in my_guesses:
+        guess = guess.translate({ord(c): None for c in bad_chars})
+        my_scores[guess] = sum([common_letters(guess, word)
+                               for word in my_answers])
+    return my_scores
 
-elimination_words = []
-with open('guess-list.json', 'r', encoding='utf-8') as f:
-    elimination_words = json.load(f)
-print("Loaded:", len(elimination_words), "guesses")
 
-# Run constraints
+def score_guesses(my_guesses, my_answers, bad_chars='', my_scores={}):
+    if len(my_guesses) == 0:
+        return my_scores
+    guess = my_guesses[0]
+    guess = guess.translate({ord(c): None for c in bad_chars})
+    my_scores[guess] = sum([common_letters(guess, word)
+                           for word in my_answers])
+    return score_guesses(my_guesses[1:], my_answers, bad_chars, my_scores)
 
-# Filter characters that don't exist
-bad_charaters = list('')
 
-# Filter known characters
-known_charaters = list('')
+sys.setrecursionlimit(15000)
+if __name__ == '__main__':
+    sys.setrecursionlimit(15000)
+    # Load data
+    answers = []
+    with open('answer-list.json', 'r', encoding='utf-8') as f:
+        answers = json.load(f)
+    words_count = len(answers)
+    print("Loaded:", words_count, "answers")
 
-# Filter known good positions
-# r"\w\w\w\w\w"
-regex_good = r"\w\w\w\w\w"
+    guesses = []
+    with open('guess-list.json', 'r', encoding='utf-8') as f:
+        guesses = json.load(f)
+    print("Loaded:", len(guesses), "guesses")
 
-# Filter known bad positions
-# r"\w\w\w\w\w"
-regex_bad = r"\w\w\w\w\w"
+    # Run constraints
 
-# Start search for most likely word
-filtered_words = words
+    # Filter characters that don't exist
+    bad_charaters = list('')
 
-# Eliminate bad characters
-if bad_charaters:
-    filtered_words = [word for word in filtered_words if all(
-        chr not in word for chr in bad_charaters)]
+    # Filter known characters
+    good_characters = list('')
 
-# Narrow to good characters
-if known_charaters:
-    filtered_words = [word for word in filtered_words if all(
-        chr in word for chr in known_charaters)]
+    # Filter known good positions
+    # r"\w\w\w\w\w"
+    good_places = r"\w\w\w\w\w"
 
-# Narrow to good characters correct placement
-if regex_good:
-    filtered_words = [
-        word for word in filtered_words if re.match(regex_good, word)]
+    # Filter known bad positions
+    # r"\w\w\w\w\w"
+    bad_places = r"\w\w\w\w\w"
 
-# Eliminate to good characters incorrect placement
-if regex_bad:
-    filtered_words = [
-        word for word in filtered_words if re.match(regex_bad, word)]
+    # Eliminate bad characters
+    if bad_charaters:
+        answers = [word for word in answers if all(
+            chr not in word for chr in bad_charaters)]
 
-# Sort by english frequency
-filtered_words = sorted(filtered_words, key=lambda word: zipf_frequency(
-    word, 'en', 'best'), reverse=True)
+    # Narrow to good characters
+    if good_characters:
+        answers = [word for word in answers if all(
+            chr in word for chr in good_characters)]
 
-words_left_count = len(filtered_words)
-print('Words left:', '{:.2%}'.format(words_left_count/words_count))
-print('Best Guess:', filtered_words[:10])
+    # Narrow to good characters correct placement
+    if good_places:
+        answers = [
+            word for word in answers if re.match(good_places, word)]
 
-# Calculate best word to eliminate choices
-# Remove words with invalid characters so we only eliminate remaining guesses
-if bad_charaters:
-    elimination_words = [word for word in elimination_words if all(
-        chr not in word for chr in bad_charaters)]
+    # Eliminate to good characters incorrect placement
+    if bad_places:
+        answers = [
+            word for word in answers if re.match(bad_places, word)]
 
-# Sorts by how many remaining words can be eliminated
-chars_to_remove = ''.join(known_charaters + bad_charaters)
+    # Sort by english frequency
+    answers = sorted(answers, key=lambda word: zipf_frequency(
+        word, 'en', 'best'), reverse=True)
 
-# Get top words
-elimination_words = sorted(elimination_words, key=lambda word: zipf_frequency(
-    word, 'en', 'large'), reverse=True)
+    words_left_count = len(answers)
+    print('Words left:', '{:.2%}'.format(words_left_count/words_count))
+    print('Best Guess:', answers[:10])
 
-elimination_words = sorted(elimination_words,
-                           key=lambda word: count_eliminated_guesses(
-                               word, filtered_words, chars_to_remove),
-                           reverse=True)
-print('Best for elimination:', elimination_words[:10])
+    # Calculate best word to eliminate choices
+    # Remove words with invalid characters so we only eliminate remaining guesses
+    if bad_charaters:
+        guesses = [word for word in guesses if all(
+            chr not in word for chr in bad_charaters)]
+
+    # Get top words
+    # Characters that we already know about and do not reduce entropy
+    chars_to_remove = ''.join(good_characters + bad_charaters)
+    process_count = 8
+    parameters = []
+    for guess_chunk in split(guesses, process_count):
+        print(len(guess_chunk))
+        parameters.append((guess_chunk, answers, bad_charaters))
+
+    with multiprocessing.Pool(processes=process_count) as pool:
+        start = timer()
+        results = pool.starmap(score_guesses_loop, parameters)
+    scores = {k: v for d in results for k, v in d.items()}
+
+    scores = sorted(scores,
+                    key=scores.get,
+                    reverse=True)
+    end = timer()
+    print('Multiprocess', end - start)
+    print('Best for elimination:', scores[:10])
